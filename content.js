@@ -79,7 +79,11 @@
   function processNewImages(element) {
     // Handle img elements
     if (element.tagName === 'IMG') {
-      applyImageMode(element, currentSettings.mode);
+      if (currentSettings.mode === 'thumbnail') {
+        applyImageThumbnailMode(element);
+      } else {
+        applyImageMode(element, currentSettings.mode);
+      }
     }
     
     // Handle elements with background images
@@ -88,7 +92,11 @@
     
     elementsWithBg.forEach(el => {
       if (hasBackgroundImage(el)) {
-        applyBackgroundImageMode(el, currentSettings.mode);
+        if (currentSettings.mode === 'thumbnail') {
+          applyBackgroundThumbnailMode(el);
+        } else {
+          applyBackgroundImageMode(el, currentSettings.mode);
+        }
       }
     });
   }
@@ -162,20 +170,18 @@
     });
   }
   
-  // Apply thumbnail mode - resize all images to 128x128
+  // Apply thumbnail mode - resize large images to 128x128, keep small images as is
   function applyThumbnailMode() {
     const css = `
       img[data-image-shader="thumbnail"] {
         max-width: 128px !important;
         max-height: 128px !important;
-        width: auto !important;
-        height: auto !important;
         object-fit: cover !important;
       }
       [data-bg-image-shader="thumbnail"] {
-        background-size: 128px 128px !important;
-        width: 128px !important;
-        height: 128px !important;
+        background-size: contain !important;
+        max-width: 128px !important;
+        max-height: 128px !important;
         background-repeat: no-repeat !important;
       }
     `;
@@ -184,13 +190,13 @@
     
     // Process existing images
     document.querySelectorAll('img').forEach(img => {
-      applyImageMode(img, 'thumbnail');
+      applyImageThumbnailMode(img);
     });
     
     // Process elements with background images
     document.querySelectorAll('*').forEach(el => {
       if (hasBackgroundImage(el)) {
-        applyBackgroundImageMode(el, 'thumbnail');
+        applyBackgroundThumbnailMode(el);
       }
     });
   }
@@ -223,6 +229,36 @@
     const style = window.getComputedStyle(element);
     const bgImage = style.backgroundImage;
     return bgImage && bgImage !== 'none' && bgImage.includes('url');
+  }
+  
+  // Apply thumbnail mode to individual image, only if larger than 128px
+  function applyImageThumbnailMode(img) {
+    // Wait for image to load to get dimensions
+    if (img.complete && img.naturalWidth && img.naturalHeight) {
+      checkImageSizeAndApply(img);
+    } else {
+      img.addEventListener('load', () => checkImageSizeAndApply(img), { once: true });
+    }
+  }
+  
+  // Check image size and apply thumbnail mode only if needed
+  function checkImageSizeAndApply(img) {
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
+    
+    if (naturalWidth > 128 || naturalHeight > 128) {
+      img.setAttribute('data-image-shader', 'thumbnail');
+    } else {
+      // Keep original size for small images
+      img.removeAttribute('data-image-shader');
+    }
+  }
+  
+  // Apply thumbnail mode to background image element
+  function applyBackgroundThumbnailMode(element) {
+    // For background images, we'll apply the thumbnail style
+    // but use 'contain' instead of fixed dimensions to prevent upscaling
+    element.setAttribute('data-bg-image-shader', 'thumbnail');
   }
   
   // Inject CSS into the page
